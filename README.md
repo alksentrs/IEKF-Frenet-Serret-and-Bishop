@@ -71,6 +71,10 @@ R = eye(3) * 0.1;  % Measurement noise
 
 filter = frenet_serret_ekf(dt, Q_x, Q_omega, Q_gamma, Q_tau, Q_u, R);
 ```
+## Output
+- Trajectory plots: Show the true target, noisy measurements, and the filter's estimate.
+![Screenshot 2025-06-06 185447](https://github.com/user-attachments/assets/ea5140af-71a2-409d-b444-c9f4b34763e2)
+
 
 ### Bishop Filter
 ```matlab
