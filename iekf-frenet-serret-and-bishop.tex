@@ -1,0 +1,197 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{geometry}
+\usepackage{authblk}
+\geometry{margin=1in}
+\usepackage{bm}
+
+\title{An Extension to the Frenet-Serret and Bishop Invariant Extended Kalman Filters for Tracking Accelerating Targets}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+Target tracking is the problem of estimating rigid body motions in 3D space that a target undergoes during motion. Traditional nonlinear state estimation algorithms such as the extended (EKF), Unscented (UKF)~\cite{julier2000new} and cubature Kalman filters (CKF)~\cite{arasaratnam2009cubature} use models with changes in velocity or acceleration modelled as Gaussian white noise to track manoeuvring targets. Other models such as the Singer acceleration model~\cite{singer1970estimating} are common in industrial radar systems with~\cite{li2003survey} providing a comprehensive review. For manoeuvring targets, a bank of filters are run in a multiple model algorithm such as the interacting multiple model IMM~\cite{li1993performance} with a Kalman filter running each model before fusing the results.
+
+Simpler dynamic models incorporating the kinematics of 3D curves have been proposed to provide a more general dynamic model for target tracking. The Frenet-Serret left-invariant extended Kalman filter (FS-LIEKF), first presented in~\cite{pilte2017tracking}, estimates the pose $\chi_t \in \mathrm{SE}(3)$ of a target along with scalar parameters describing the shape and motion of the trajectory. The Frenet-Serret formulae are used to propagate the target pose since they provide a concise means of characterising smooth curves $\gamma$, in this case the target trajectory, in 3D space ($\gamma \in \mathbb{R}^3$) through the formulae in Equation~\eqref{eq:frenet}.
+
+\begin{equation}
+\begin{bmatrix}
+\dot{T} \\
+\dot{N} \\
+\dot{B}
+\end{bmatrix}
+= u
+\begin{bmatrix}
+0 & \kappa & 0 \\
+-\kappa & 0 & \tau \\
+0 & -\tau & 0
+\end{bmatrix}
+\begin{bmatrix}
+T \\
+N \\
+B
+\end{bmatrix}
+\label{eq:frenet}
+\end{equation}
+
+Bishop showed that the Frenet-Serret frame is not the only frame that can be readily applied to curves, extending the Frenet equations to be globally defined~\cite{bishop1975more} with two signed curvatures rather than a single curvature and torsion. While the Frenet frame defines the true geometry of the space curve, with the unit normal vector $N$ pointing towards the centre of curvature in the osculating plane, the Bishop formulae, shown in Equation~\eqref{eq:bishop}, enable us to initialise any starting attitude with the development equations valid for any frame.
+
+\begin{equation}
+\begin{bmatrix}
+\dot{T} \\
+\dot{M}_1 \\
+\dot{M}_2
+\end{bmatrix}
+= u
+\begin{bmatrix}
+0 & \kappa_1 & \kappa_2 \\
+-\kappa_1 & 0 & 0 \\
+-\kappa_2 & 0 & 0
+\end{bmatrix}
+\begin{bmatrix}
+T \\
+M_1 \\
+M_2
+\end{bmatrix}
+\label{eq:bishop}
+\end{equation}
+
+The Bishop or parallel transport frame has previously been used to define tracking problems and has been implemented within an invariant extended Kalman filter for tracking a manoeuvring target with radar measurements~\cite{gibbs2022invariant}. Both approaches are well suited to tracking problems given the ability to define complex curves using slow changing or even constant parameters.
+
+While the curvature $\hat{\kappa}_t$ and torsion $\hat{\tau}_t$ parameters of the Frenet-Serret apparatus in the FS-LIEKF of~\cite{pilte2017tracking} are able to account for the twisting motion of trajectories, tangential accelerations cannot be estimated and the filter relies upon process noise on the norm velocity $\hat{u}_t$ and unit tangent vector $T$ to estimate the magnitude and direction. The same is true for the Bishop frame implementation or B-LIEKF, albeit with the replacement of curvature and torsion with the two Bishop curvatures $\hat{\kappa}_1$, $\hat{\kappa}_2$. This extension was originally noted by Pilte~\cite{piltePhD} with the warning that the acceleration would degrade performance on trajectories with constant velocity segments, similar to the results seen when comparing simple CV and CA EKFs.
+
+With more modern targets able to manoeuvre with high accelerations it is critical to have a kinematic model that can adapt well to large changes in velocity. This paper presents the extension to the Frenet-Serret and Bishop IEKF algorithms to account for accelerating targets. The state error propagation matrix for the Bishop implementation is derived and a short simulation is produced to highlight the improved performance during components of trajectories with non-constant velocity.
+
+\section{Frenet-Serret and Bishop Acceleration LIEKFs}
+
+The invariant extended Kalman filter (IEKF) is a recent extension to the Kalman filter that enables the definition of state spaces on matrix Lie groups~\cite{bonnabel2007left}. The key advantage of the IEKF is that by defining a left or right-invariant estimation error, the linearisation is performed on independent error dynamics. This ensures that the computed Kalman gain is not dependent on the accuracy of the current state estimate and hence convergence can be guaranteed for a wider range of trajectories~\cite{barrau2016invariant}. Barrau and Bonnabel present a complete introduction to the IEKF in~\cite{barrau2018invariant}, with the Unscented variant covered in~\cite{brossard2020code}. The non-accelerating form of the Frenet-Serret process model can be found in~\cite{pilte2017tracking, marion2019invariant}.
+
+Here, the attitude of the target is expressed as the Frenet-Serret or Bishop rotation matrix $R_t$ as in~\cite{pilte2017tracking}. The only change is to assume that an acceleration $a_t$ acts on the target to update the norm velocity $u_t$. Changes in this acceleration, referred to as jerk, are modelled as Gaussian white noise. The equivalent Bishop frame dynamics are written as:
+
+\begin{equation}
+\begin{aligned}
+\frac{d}{dt} R_t &= R_t[\omega_{b,t} + w^\omega_t]_\times \in \mathrm{SO}(3) \\
+\frac{d}{dt} x_t &= R_t(v_t + w^x_t) \in \mathbb{R}^3 \\
+\frac{d}{dt} \kappa_{1,t} &= w^{\kappa_1}_t \in \mathbb{R} \\
+\frac{d}{dt} \kappa_{2,t} &= w^{\kappa_2}_t \in \mathbb{R} \\
+\frac{d}{dt} u_t &= a_t + w^u_t \in \mathbb{R} \\
+\frac{d}{dt} a_t &= w^a_t \in \mathbb{R}
+\end{aligned}
+\label{eq:bishop_dyn}
+\end{equation}
+
+The target velocity $v_t = [u_t, 0, 0]^T$, and the Bishop Darboux vector is $\omega_{b,t} = [0, -\kappa_2, \kappa_1]^T$. Process noise for the position is applied only in the tangential direction.
+
+\subsection*{A. IEKF Algorithm}
+
+This paper provides the key stages in deriving the state error propagation matrix for the Ba-LIEKF. The state errors are defined as:
+
+\begin{equation}
+\eta =
+\left\{
+\chi_t^{-1} \hat{\chi}_t,\ 
+\hat{\zeta}_t - \zeta_t
+\right\}
+=
+\begin{bmatrix}
+R_t^\top \hat{R}_t \\
+R_t^\top(\hat{x}_t - x_t) \\
+\hat{\kappa}_{1,t} - \kappa_{1,t} \\
+\hat{\kappa}_{2,t} - \kappa_{2,t} \\
+\hat{u}_t - u_t \\
+\hat{a}_t - a_t
+\end{bmatrix}
+\label{eq:eta_def}
+\end{equation}
+
+Linearising the error dynamics using $\eta_{R_t} \approx I_3 + [\xi_{R_t}]_\times$, we obtain:
+
+\begin{equation}
+\frac{d}{dt} \xi_t =
+\begin{bmatrix}
+-[\omega_{b,t} + w^\omega_{b,t}]_\times (I_3 + [\xi_{R_t}]_\times) + (I_3 + [\xi_{R_t}]_\times)[\hat{\omega}_{b,t}]_\times \\
+-[\omega_{b,t} + w^\omega_t]_\times \xi_{x_t} + v_t + w^u_t - (I_3 + [\xi_{R_t}]_\times) \hat{v}_t \\
+- w^{\kappa_1}_t \\
+- w^{\kappa_2}_t \\
+\xi_{a_t} - w^u_t \\
+- w^a_t
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+A_t = -
+\begin{bmatrix}
+0 & -\hat{\kappa}_1 & -\hat{\kappa}_2 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+\hat{\kappa}_1 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 \\
+\hat{\kappa}_2 & 0 & 0 & 0 & 0 & 0 & -1 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & -\hat{\kappa}_1 & -\hat{\kappa}_2 & 0 & 0 & -1 & 0 \\
+0 & 0 & -\hat{u}_t & \hat{\kappa}_1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & \hat{u}_t & 0 & \hat{\kappa}_2 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & -1 \\
+0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+\end{bmatrix}
+\label{eq:At_matrix}
+\end{equation}
+
+\subsubsection*{1) Propagation}
+
+\begin{equation}
+P_{k|k-1} = \Phi_k P_{k-1|k-1} \Phi_k^\top + \check{Q}_k
+\quad \text{where} \quad
+\Phi_k = \exp(A_t \Delta t)
+\label{eq:propagation}
+\end{equation}
+
+\subsubsection*{2) Update Equations}
+
+\begin{equation}
+K_k = P_{k|k-1} \tilde{H}_k^\top \left( \tilde{H}_k P_{k|k-1} \tilde{H}_k^\top + N^R_k \right)^{-1}
+\label{eq:kalman_gain}
+\end{equation}
+
+\begin{equation}
+P_{k|k} = \left( I_{10} - K_k \tilde{H}_k \right) P_{k|k-1}
+\label{eq:cov_update}
+\end{equation}
+
+\begin{equation}
+\begin{cases}
+\hat{\chi}_{k|k} = \hat{\chi}_{k|k-1} \cdot \exp_{\mathrm{SE}(3)}\left( K^\chi_k \left( Y_n - h(\hat{\chi}_{k|k-1}) \right) \right) \\
+\hat{\zeta}_{k|k} = \hat{\zeta}_{k|k-1} + K^\zeta_k \left( Y_n - h(\hat{\chi}_{k|k-1}) \right)
+\end{cases}
+\label{eq:lie_vector_update}
+\end{equation}
+
+\section{Experimental Results}
+
+The IEKFs with the accelerating form of the Frenet-Serret and Bishop dynamic models are implemented in a radar tracking scenario with a target performing a trajectory comprising constant velocity, accelerating, and spiralling segments. The observer is kept stationary for simplicity and receives range and bearing measurements at 5~Hz with uncertainties of 0.01~rad and 5~m, respectively. The filters update at 25~Hz, propagating using the kinematic models when a measurement is not available. The process noises for all filters have been tuned manually.
+
+\subsection*{A. Single Simulation}
+
+The FSa-LIEKF and Ba-LIEKF are implemented and compared to the FS-LIEKF and B-LIEKF. For comparison with typical algorithms used in industry, a variety of Cartesian CV and CA filters are implemented, along with the CA-CV IMM2.
+
+All four algorithms perform well on this trajectory, but the accelerating forms show slightly reduced tracking error during the decelerating components immediately before and after the spiral manoeuvre. The FSa-LIEKF and Ba-LIEKF adapt more quickly to velocity changes, while performing slightly worse during constant velocity segments.
+
+\section*{References}
+
+
+\begin{thebibliography}{1}
+
+    \bibitem{gibbs2022extension}
+    J.~Gibbs, D.~Anderson, M.~MacDonald, and J.~Russell,
+    ``An extension to the Frenet-Serret and Bishop invariant extended Kalman filters for tracking accelerating targets,'' 
+    in \emph{Proc. 2022 Sensor Signal Processing for Defence (SSPD)}, Edinburgh, UK, Sept. 2022, pp. 1--5, doi: \texttt{10.1109/SSPD54131.2022.9896179}.
+    
+\end{thebibliography}
+
+
+\end{document}
