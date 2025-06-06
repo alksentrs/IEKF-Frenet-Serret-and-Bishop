@@ -149,6 +149,8 @@ classdef bishop_ekf < handle
             
             % Row 10 (Acceleration)
             % F(10,:) = 0 by default
+
+            F = -F;
         end
         
         function Bmat = B(~, delta_omega)

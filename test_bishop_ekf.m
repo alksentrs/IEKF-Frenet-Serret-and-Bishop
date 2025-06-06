@@ -14,7 +14,7 @@ Q_u = .1;                          % Tangential velocity process noise
 Q_a = .1;                          % Tangential acceleration process noise
 
 % Measurement noise
-R = diag([0.01; 0.01; .02]);          % Measurement noise
+R = diag([0.1; 0.1; .2]);          % Measurement noise
 
 % Initialize EKF
 ekf = bishop_ekf(dt, Q_x, Q_omega, Q_kappa1, Q_kappa2, Q_u, Q_a, R);
